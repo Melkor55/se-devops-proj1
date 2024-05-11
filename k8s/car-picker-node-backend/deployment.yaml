@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: car-picker-node-backend-deployment
+  namespace: car-picker
+  labels:
+    app: car-picker-node-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: car-picker-node-backend
+  template:
+    metadata:
+      labels:
+        app: car-picker-node-backend
+    spec:
+      containers:
+      - name: car-picker-node-backend
+        image: melkor55/car-picker-node-backend-1:v1.0
+        resources:
+          limits:
+            memory: "1024Mi"
+            cpu: "1500m"
+        ports:
+        - containerPort: 3005
+
