@@ -1,0 +1,160 @@
+# Default values for opentelemetry-collector.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Valid values are "daemonset", "deployment", and "statefulset".
+mode: "daemonset"
+
+presets:
+  # Configures the collector to collect logs.
+  # Adds the filelog receiver to the logs pipeline
+  # and adds the necessary volumes and volume mounts.
+  # Best used with mode = daemonset.
+  # See https://opentelemetry.io/docs/kubernetes/collector/components/#filelog-receiver for details on the receiver.
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+
+# Base collector configuration.
+# Supports templating. To escape existing instances of {{ }}, use {{` <original content> `}}.
+# For example, {{ REDACTED_EMAIL }} becomes {{` {{ REDACTED_EMAIL }} `}}.
+config:
+  exporters:
+    logging: 
+      loglevel: warn
+    otlp:
+      endpoint: http://tempo-distributor.car-picker-monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+    loki:
+      endpoint: http://loki.car-picker-monitoring.svc.cluster.local:3100/loki/api/v1/push
+      tls:
+        insecure: true  
+
+  extensions:
+    # The health_check extension is mandatory for this chart.
+    # Without the health_check extension the collector will fail the readiness and liveliness probes.
+    # The health_check extension can be modified, but should never be removed.
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133
+
+  processors:
+    batch: {}
+    # If set to null, will be overridden with values based on k8s resource limits
+    memory_limiter: 
+      limit_mib: 100
+      spike_limit_mib: 10
+      check_interval: 5s
+    attributes:
+      actions:
+      - action: insert
+        key: loki.attributes.labels
+        value: http_status_code, log.file.path
+    resource:
+      attributes:
+      - action: insert
+        key: loki.format
+        value: json
+        # loki does not support labels with ".", so the following lines are needed to transform the labels into ones supported by loki
+      - action: insert
+        key: container_name
+        from_attribute: k8s.container.name
+      - action: insert
+        key: container_restart_count
+        from_attribute: k8s.container.restart_count
+      - action: insert
+        key: namespace
+        from_attribute: k8s.namespace.name
+      - action: insert
+        key: pod_name
+        from_attribute: k8s.pod.name
+      - action: insert
+        key: pod_uid
+        from_attribute: k8s.pod.uid
+        # then the mapped labels are then inserted into loki
+      - action: insert
+        key: loki.resource.labels
+        value: container_name, container_restart_count, namespace, pod_name, pod_uid
+
+    
+  receivers:
+    jaeger:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: ${env:MY_POD_IP}:4317
+        http:
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: opentelemetry-collector
+            scrape_interval: 10s
+            static_configs:
+              - targets:
+                  - ${env:MY_POD_IP}:8888
+
+  service:
+    telemetry:
+      metrics:
+        address: ${env:MY_POD_IP}:8888
+    extensions:
+      - health_check
+    pipelines:
+      logs:
+        exporters:
+          # - debug
+          - loki
+        processors:
+          - resource
+        receivers:
+          - otlp
+      metrics:
+        exporters:
+          - logging
+        # processors:
+        #   - memory_limiter
+        #   - batch
+        # receivers:
+        #   - otlp
+        #   - prometheus
+      traces:
+        exporters:
+          - otlp
+        processors:
+          - memory_limiter
+        receivers:
+          - otlp
+          # - jaeger
+          # - zipkin
+
+image:
+  # If you want to use the core image `otel/opentelemetry-collector`, you also need to change `command.name` value to `otelcol`.
+  repository: "otel/opentelemetry-collector-contrib"
+  pullPolicy: IfNotPresent
+
+# OpenTelemetry Collector executable
+command:
+  name: "otelcol-contrib"
+  extraArgs: []
+
+# Configuration for ports
+# nodePort is also allowed
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    hostPort: 4317
+    protocol: TCP
+  otlp-http:
+  jaeger-compact:
+  jaeger-thrift:
+  jaeger-grpc:
+  zipkin:
+  metrics:
+
+# Resource limits & requests. Update according to your own use case as these values might be too low for a typical deployment.
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2048Mi
