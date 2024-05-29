@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: car-picker-react-frontend-deployment
+  namespace: car-picker
+  labels:
+    app: car-picker-react-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: car-picker-react-frontend
+  template:
+    metadata:
+      labels:
+        app: car-picker-react-frontend
+    spec:
+      containers:
+      - name: car-picker-react-frontend
+        image: melkor55/car-picker-react-frontend-1:v1.0
+        resources:
+          limits:
+            memory: "2048Mi"
+            cpu: "2500m"
+        ports:
+        - containerPort: 3000
+

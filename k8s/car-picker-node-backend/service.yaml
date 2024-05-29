@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: car-picker-node-backend-service
+  namespace: car-picker
+spec:
+  selector:
+    app: car-picker-node-backend
+  type: ClusterIP
+  ports:
+  - name: main-app-port
+    # port exposed on the host(pc,server,etc.)
+    port: 3005
+    # port used within the pod (same as described in the deployment file for example)
+    targetPort: 3005
