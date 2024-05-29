@@ -55,7 +55,8 @@ config:
       - action: insert
         key: loki.format
         value: json
-        # loki does not support labels with ".", so the following lines are needed to transform the labels into ones supported by loki
+        # loki does not support labels with ".", so the following lines 
+        #   are needed to transform the labels into ones supported by loki
       - action: insert
         key: container_name
         from_attribute: k8s.container.name
@@ -82,6 +83,7 @@ config:
     otlp:
       protocols:
         grpc:
+          # will thake the default value
           endpoint: ${env:MY_POD_IP}:4317
         http:
     prometheus:
